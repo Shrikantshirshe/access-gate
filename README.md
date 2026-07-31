@@ -1,5 +1,7 @@
 # Community Access Gate
 
+![Frontend CI](https://github.com/Shrikantshirshe/community-access-gate-midnight/actions/workflows/frontend-ci.yml/badge.svg?branch=main) ![Contract CI](https://github.com/Shrikantshirshe/community-access-gate-midnight/actions/workflows/contract-ci.yml/badge.svg?branch=main)
+
 A moderator checkpoint that proves community membership without publishing a member handle or raw membership path.
 
 ## Moderation workflow
@@ -46,3 +48,6 @@ Frontend CI owns browser build validation. Contract CI owns Compact setup, compi
 
 Demo: [watch the community access walkthrough](https://drive.google.com/file/d/109VfDLFmNeRN2wsmMAMUcuNLfkA4Inv4/view?usp=sharing).
 
+## Verification
+
+Privacy is the product feature: the member list and inclusion path remain private, while root rotation and aggregate access state are auditable. Run `npm test`, `npm run compile`, and `npm run build`; the five contract scenarios are documented in [TESTING.md](./TESTING.md), the product scope is in [PROPOSAL.md](./PROPOSAL.md), and both CI workflows run on every push and pull request.
