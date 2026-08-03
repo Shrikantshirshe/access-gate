@@ -22,14 +22,18 @@ The public ledger exposes the server root, aggregate joins, nullifiers, and admi
 ## Deployment reference
 
 ```text
-Network: Midnight Preprod
+Network: Midnight Preview
 Contract: server_allowlist
-Address: 67466516d32ae3c1166c6581e98e7a04a063ec589663ea3ad504f450d24f6114
-Deployment transaction: 352a9f1204c201db51c0a827c3760af1999919e827c6a1e2c355b4fe36c12131
-Verification: Confirmed by the Midnight Preprod indexer
+Address: 17c68923ae0d7d275b107cd52d4481ce2cb2be0c19306127d22319dce01490ad
+Deployment transaction: 00790ed64f198512be053dbd07552a1de1f6b70cd34c56ba9ae1ab6ea380f0e517
+Gate deployer: mn_addr_preview1hprtcdx066s54d7r0529nmvk8sqjun68n8y2wptmhh3sxry927zs6afnmk
+Deployment time: 2026-08-03T19:06:23.002Z
+Verification: Confirmed by the Midnight Preview indexer
 ```
 
 ## Work locally
+
+Community-gate testing uses tNight from the [Midnight Preview faucet](https://faucet.preview.midnight.network/).
 
 ```bash
 npm install
@@ -40,7 +44,7 @@ npm run dev
 npm run deploy
 ```
 
-The deploy command assumes an intentionally configured Preprod wallet. Keep membership fixtures synthetic and keep wallet recovery material out of every file and log.
+The deploy command assumes an intentionally configured Preview wallet. Keep membership fixtures synthetic and keep wallet recovery material out of every file and log.
 
 ## Automation contract
 

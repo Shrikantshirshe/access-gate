@@ -15,7 +15,7 @@ The current root, aggregate joins, and nullifier activity are auditable. Member 
 ## User journey
 
 1. Moderator publishes or rotates the server root.
-2. Member connects a Preprod wallet.
+2. Member connects a Preview wallet.
 3. Member submits an inclusion proof.
 4. Contract issues one private entry claim.
 
@@ -25,4 +25,3 @@ The current root, aggregate joins, and nullifier activity are auditable. Member 
 - Valid membership paths pass.
 - Invalid paths fail.
 - Duplicate entry claims are rejected.
-
