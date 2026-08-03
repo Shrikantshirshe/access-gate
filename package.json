@@ -6,7 +6,10 @@
     "compile": "npx nightforge compile",
     "deploy": "node deploy.mjs",
     "test": "vitest run",
+    "prepare:access-proofs": "node scripts/sync-zk-assets.mjs",
+    "predev": "npm run prepare:access-proofs",
     "dev": "vite",
+    "prebuild": "npm run prepare:access-proofs",
     "build": "tsc && vite build"
   },
   "devDependencies": {

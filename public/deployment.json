@@ -1,0 +1,9 @@
+{
+  "network": "preview",
+  "contract": "server_allowlist",
+  "contractAddress": "17c68923ae0d7d275b107cd52d4481ce2cb2be0c19306127d22319dce01490ad",
+  "transactionHash": "00790ed64f198512be053dbd07552a1de1f6b70cd34c56ba9ae1ab6ea380f0e517",
+  "deployer": "mn_addr_preview1hprtcdx066s54d7r0529nmvk8sqjun68n8y2wptmhh3sxry927zs6afnmk",
+  "deployedAt": "2026-08-03T19:06:23.002Z",
+  "verifiedBy": "Midnight Preview indexer"
+}
