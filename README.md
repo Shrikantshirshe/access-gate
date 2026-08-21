@@ -62,3 +62,7 @@ Demo: [watch the community access walkthrough](https://drive.google.com/file/d/1
 ## Verification
 
 Privacy is the product feature: the member list and inclusion path remain private, while root rotation and aggregate access state are auditable. Run `npm test`, `npm run compile`, and `npm run build`; the five contract scenarios are documented in [TESTING.md](./TESTING.md), the product scope is in [PROPOSAL.md](./PROPOSAL.md), and both CI workflows run on every push and pull request.
+
+## Gateway operations
+
+Before operating Access Gate, read the independent [security model](SECURITY.md) and [operations runbook](OPERATIONS.md). Runtime configuration is fail-closed and its executable checks live in [src/test/runtime-config.test.ts](src/test/runtime-config.test.ts).
