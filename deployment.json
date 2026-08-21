@@ -1,4 +1,5 @@
 {
+  "contractName": "server_allowlist",
   "contractAddress": "17c68923ae0d7d275b107cd52d4481ce2cb2be0c19306127d22319dce01490ad",
   "network": "preview",
   "deployedAt": "2026-08-03T19:06:23.002Z",
