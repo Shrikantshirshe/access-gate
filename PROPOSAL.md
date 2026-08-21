@@ -1,5 +1,9 @@
 # Product Proposal: Community Access Gate
 
+**Category:** Identity/credentials  
+**Community-gate owner:** `Shrikantshirshe`  
+**Gate status:** Test-covered Preview MVP
+
 ## Problem
 
 Communities need membership checks without publishing usernames, member lists, or inclusion paths.

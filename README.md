@@ -4,6 +4,13 @@
 
 A moderator checkpoint that proves community membership without publishing a member handle or raw membership path.
 
+## Moderator verification shelf
+
+- Membership idea: [PROPOSAL.md](./PROPOSAL.md)
+- Root, path, and duplicate-entry tests: [server.test.ts](./src/test/server.test.ts)
+- Reproduction handbook: [TESTING.md](./TESTING.md)
+- Preview access-gate record: [deployment.json](./deployment.json)
+
 ## Moderation workflow
 
 Community operators can rotate the server root, members can present a private inclusion proof, and the contract can prevent repeat entry claims. The violet-and-teal dashboard emphasizes root freshness, access state, wallet readiness, contract identity, and confirmed activity for moderators.
