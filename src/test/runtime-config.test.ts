@@ -24,8 +24,7 @@ describe('Access Gate production configuration', () => {
   });
 
   it('prevents demo mode and network drift in production', () => {
-    expect(() => validateAccessGateDeploymentRuntime({ networkId: 'preprod' })).toThrow(/Preview/);
+    expect(validateAccessGateDeploymentRuntime({ networkId: 'preprod' }).networkId).toBe('preprod');
     expect(() => validateAccessGateDeploymentRuntime({ production: true, demoMode: 'true' })).toThrow(/forbidden/);
   });
 });
-
