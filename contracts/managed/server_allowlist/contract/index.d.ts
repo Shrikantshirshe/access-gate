@@ -20,7 +20,7 @@ export type ProvableCircuits<PS> = {
 
 export type PureCircuits = {
   hashNodes(left_0: Uint8Array, right_0: Uint8Array): Uint8Array;
-  computeRootDepth3(leaf_0: Uint8Array,
+  computeRootDepth6(leaf_0: Uint8Array,
                     proof_0: Uint8Array[],
                     directions_0: boolean[]): Uint8Array;
   publicKey(sk_0: Uint8Array): Uint8Array;
@@ -34,7 +34,7 @@ export type Circuits<PS> = {
   hashNodes(context: __compactRuntime.CircuitContext<PS>,
             left_0: Uint8Array,
             right_0: Uint8Array): __compactRuntime.CircuitResults<PS, Uint8Array>;
-  computeRootDepth3(context: __compactRuntime.CircuitContext<PS>,
+  computeRootDepth6(context: __compactRuntime.CircuitContext<PS>,
                     leaf_0: Uint8Array,
                     proof_0: Uint8Array[],
                     directions_0: boolean[]): __compactRuntime.CircuitResults<PS, Uint8Array>;

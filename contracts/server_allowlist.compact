@@ -14,8 +14,8 @@ constructor(root: Bytes<32>, admin_pk: Bytes<32>) {
 }
 
 witness localSecretKey(): Bytes<32>;
-witness merkleProof(): Vector<3, Bytes<32>>;
-witness merkleDirections(): Vector<3, Boolean>;
+witness merkleProof(): Vector<6, Bytes<32>>;
+witness merkleDirections(): Vector<6, Boolean>;
 
 export circuit updateRoot(new_root: Bytes<32>): [] {
   assert(disclose(publicKey(localSecretKey())) == admin, "Only admin can update root");
@@ -29,7 +29,7 @@ export circuit claimEntry(): [] {
   // Recompute Merkle root and assert it matches on-chain server_root
   const proof = merkleProof();
   const directions = merkleDirections();
-  const calculated_root = computeRootDepth3(pk, proof, directions);
+  const calculated_root = computeRootDepth6(pk, proof, directions);
   
   assert(disclose(calculated_root) == server_root, "User is not in the server whitelist");
 
@@ -45,11 +45,14 @@ export circuit hashNodes(left: Bytes<32>, right: Bytes<32>): Bytes<32> {
   return persistentHash<Vector<2, Bytes<32>>>([left, right]);
 }
 
-export circuit computeRootDepth3(leaf: Bytes<32>, proof: Vector<3, Bytes<32>>, directions: Vector<3, Boolean>): Bytes<32> {
+export circuit computeRootDepth6(leaf: Bytes<32>, proof: Vector<6, Bytes<32>>, directions: Vector<6, Boolean>): Bytes<32> {
   const hash0 = directions[0] ? hashNodes(leaf, proof[0]) : hashNodes(proof[0], leaf);
   const hash1 = directions[1] ? hashNodes(hash0, proof[1]) : hashNodes(proof[1], hash0);
   const hash2 = directions[2] ? hashNodes(hash1, proof[2]) : hashNodes(proof[2], hash1);
-  return hash2;
+  const hash3 = directions[3] ? hashNodes(hash2, proof[3]) : hashNodes(proof[3], hash2);
+  const hash4 = directions[4] ? hashNodes(hash3, proof[4]) : hashNodes(proof[4], hash3);
+  const hash5 = directions[5] ? hashNodes(hash4, proof[5]) : hashNodes(proof[5], hash4);
+  return hash5;
 }
 
 export circuit publicKey(sk: Bytes<32>): Bytes<32> {

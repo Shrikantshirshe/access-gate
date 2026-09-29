@@ -3,11 +3,11 @@ __compactRuntime.checkRuntimeVersion('0.15.0');
 
 const _descriptor_0 = new __compactRuntime.CompactTypeBytes(32);
 
-const _descriptor_1 = new __compactRuntime.CompactTypeVector(3, _descriptor_0);
+const _descriptor_1 = new __compactRuntime.CompactTypeVector(6, _descriptor_0);
 
 const _descriptor_2 = __compactRuntime.CompactTypeBoolean;
 
-const _descriptor_3 = new __compactRuntime.CompactTypeVector(3, _descriptor_2);
+const _descriptor_3 = new __compactRuntime.CompactTypeVector(6, _descriptor_2);
 
 const _descriptor_4 = new __compactRuntime.CompactTypeUnsignedInteger(65535n, 2);
 
@@ -136,8 +136,8 @@ export class Contract {
       hashNodes(context, ...args_1) {
         return { result: pureCircuits.hashNodes(...args_1), context };
       },
-      computeRootDepth3(context, ...args_1) {
-        return { result: pureCircuits.computeRootDepth3(...args_1), context };
+      computeRootDepth6(context, ...args_1) {
+        return { result: pureCircuits.computeRootDepth6(...args_1), context };
       },
       publicKey(context, ...args_1) {
         return { result: pureCircuits.publicKey(...args_1), context };
@@ -313,11 +313,11 @@ export class Contract {
     const witnessContext_0 = __compactRuntime.createWitnessContext(ledger(context.currentQueryContext.state), context.currentPrivateState, context.currentQueryContext.address);
     const [nextPrivateState_0, result_0] = this.witnesses.merkleProof(witnessContext_0);
     context.currentPrivateState = nextPrivateState_0;
-    if (!(Array.isArray(result_0) && result_0.length === 3 && result_0.every((t) => t.buffer instanceof ArrayBuffer && t.BYTES_PER_ELEMENT === 1 && t.length === 32))) {
+    if (!(Array.isArray(result_0) && result_0.length === 6 && result_0.every((t) => t.buffer instanceof ArrayBuffer && t.BYTES_PER_ELEMENT === 1 && t.length === 32))) {
       __compactRuntime.typeError('merkleProof',
                                  'return value',
                                  'server_allowlist.compact line 17 char 1',
-                                 'Vector<3, Bytes<32>>',
+                                 'Vector<6, Bytes<32>>',
                                  result_0)
     }
     partialProofData.privateTranscriptOutputs.push({
@@ -330,11 +330,11 @@ export class Contract {
     const witnessContext_0 = __compactRuntime.createWitnessContext(ledger(context.currentQueryContext.state), context.currentPrivateState, context.currentQueryContext.address);
     const [nextPrivateState_0, result_0] = this.witnesses.merkleDirections(witnessContext_0);
     context.currentPrivateState = nextPrivateState_0;
-    if (!(Array.isArray(result_0) && result_0.length === 3 && result_0.every((t) => typeof(t) === 'boolean'))) {
+    if (!(Array.isArray(result_0) && result_0.length === 6 && result_0.every((t) => typeof(t) === 'boolean'))) {
       __compactRuntime.typeError('merkleDirections',
                                  'return value',
                                  'server_allowlist.compact line 18 char 1',
-                                 'Vector<3, Boolean>',
+                                 'Vector<6, Boolean>',
                                  result_0)
     }
     partialProofData.privateTranscriptOutputs.push({
@@ -376,7 +376,7 @@ export class Contract {
     const pk_0 = this._publicKey_0(sk_0);
     const proof_0 = this._merkleProof_0(context, partialProofData);
     const directions_0 = this._merkleDirections_0(context, partialProofData);
-    const calculated_root_0 = this._computeRootDepth3_0(pk_0,
+    const calculated_root_0 = this._computeRootDepth6_0(pk_0,
                                                         proof_0,
                                                         directions_0);
     __compactRuntime.assert(this._equal_1(calculated_root_0,
@@ -449,7 +449,7 @@ export class Contract {
   _hashNodes_0(left_0, right_0) {
     return this._persistentHash_0([left_0, right_0]);
   }
-  _computeRootDepth3_0(leaf_0, proof_0, directions_0) {
+  _computeRootDepth6_0(leaf_0, proof_0, directions_0) {
     const hash0_0 = directions_0[0] ?
                     this._hashNodes_0(leaf_0, proof_0[0]) :
                     this._hashNodes_0(proof_0[0], leaf_0);
@@ -459,7 +459,16 @@ export class Contract {
     const hash2_0 = directions_0[2] ?
                     this._hashNodes_0(hash1_0, proof_0[2]) :
                     this._hashNodes_0(proof_0[2], hash1_0);
-    return hash2_0;
+    const hash3_0 = directions_0[3] ?
+                    this._hashNodes_0(hash2_0, proof_0[3]) :
+                    this._hashNodes_0(proof_0[3], hash2_0);
+    const hash4_0 = directions_0[4] ?
+                    this._hashNodes_0(hash3_0, proof_0[4]) :
+                    this._hashNodes_0(proof_0[4], hash3_0);
+    const hash5_0 = directions_0[5] ?
+                    this._hashNodes_0(hash4_0, proof_0[5]) :
+                    this._hashNodes_0(proof_0[5], hash4_0);
+    return hash5_0;
   }
   _publicKey_0(sk_0) {
     return this._persistentHash_0([new Uint8Array([115, 101, 114, 118, 101, 114, 58, 112, 107, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -676,35 +685,35 @@ export const pureCircuits = {
     }
     return _dummyContract._hashNodes_0(left_0, right_0);
   },
-  computeRootDepth3: (...args_0) => {
+  computeRootDepth6: (...args_0) => {
     if (args_0.length !== 3) {
-      throw new __compactRuntime.CompactError(`computeRootDepth3: expected 3 arguments (as invoked from Typescript), received ${args_0.length}`);
+      throw new __compactRuntime.CompactError(`computeRootDepth6: expected 3 arguments (as invoked from Typescript), received ${args_0.length}`);
     }
     const leaf_0 = args_0[0];
     const proof_0 = args_0[1];
     const directions_0 = args_0[2];
     if (!(leaf_0.buffer instanceof ArrayBuffer && leaf_0.BYTES_PER_ELEMENT === 1 && leaf_0.length === 32)) {
-      __compactRuntime.typeError('computeRootDepth3',
+      __compactRuntime.typeError('computeRootDepth6',
                                  'argument 1',
                                  'server_allowlist.compact line 48 char 1',
                                  'Bytes<32>',
                                  leaf_0)
     }
-    if (!(Array.isArray(proof_0) && proof_0.length === 3 && proof_0.every((t) => t.buffer instanceof ArrayBuffer && t.BYTES_PER_ELEMENT === 1 && t.length === 32))) {
-      __compactRuntime.typeError('computeRootDepth3',
+    if (!(Array.isArray(proof_0) && proof_0.length === 6 && proof_0.every((t) => t.buffer instanceof ArrayBuffer && t.BYTES_PER_ELEMENT === 1 && t.length === 32))) {
+      __compactRuntime.typeError('computeRootDepth6',
                                  'argument 2',
                                  'server_allowlist.compact line 48 char 1',
-                                 'Vector<3, Bytes<32>>',
+                                 'Vector<6, Bytes<32>>',
                                  proof_0)
     }
-    if (!(Array.isArray(directions_0) && directions_0.length === 3 && directions_0.every((t) => typeof(t) === 'boolean'))) {
-      __compactRuntime.typeError('computeRootDepth3',
+    if (!(Array.isArray(directions_0) && directions_0.length === 6 && directions_0.every((t) => typeof(t) === 'boolean'))) {
+      __compactRuntime.typeError('computeRootDepth6',
                                  'argument 3',
                                  'server_allowlist.compact line 48 char 1',
-                                 'Vector<3, Boolean>',
+                                 'Vector<6, Boolean>',
                                  directions_0)
     }
-    return _dummyContract._computeRootDepth3_0(leaf_0, proof_0, directions_0);
+    return _dummyContract._computeRootDepth6_0(leaf_0, proof_0, directions_0);
   },
   publicKey: (...args_0) => {
     if (args_0.length !== 1) {
@@ -714,7 +723,7 @@ export const pureCircuits = {
     if (!(sk_0.buffer instanceof ArrayBuffer && sk_0.BYTES_PER_ELEMENT === 1 && sk_0.length === 32)) {
       __compactRuntime.typeError('publicKey',
                                  'argument 1',
-                                 'server_allowlist.compact line 55 char 1',
+                                 'server_allowlist.compact line 58 char 1',
                                  'Bytes<32>',
                                  sk_0)
     }
@@ -728,7 +737,7 @@ export const pureCircuits = {
     if (!(sk_0.buffer instanceof ArrayBuffer && sk_0.BYTES_PER_ELEMENT === 1 && sk_0.length === 32)) {
       __compactRuntime.typeError('computeNullifier',
                                  'argument 1',
-                                 'server_allowlist.compact line 59 char 1',
+                                 'server_allowlist.compact line 62 char 1',
                                  'Bytes<32>',
                                  sk_0)
     }

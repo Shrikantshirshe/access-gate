@@ -60,7 +60,7 @@
       }
     },
     {
-      "name": "computeRootDepth3",
+      "name": "computeRootDepth6",
       "pure": true,
       "proof": false,
       "arguments": [
@@ -75,7 +75,7 @@
           "name": "proof",
           "type": {
             "type-name": "Vector",
-            "length": 3,
+            "length": 6,
             "type": {
               "type-name": "Bytes",
               "length": 32
@@ -86,7 +86,7 @@
           "name": "directions",
           "type": {
             "type-name": "Vector",
-            "length": 3,
+            "length": 6,
             "type": {
               "type-name": "Boolean"
             }
@@ -151,7 +151,7 @@
       ],
       "result type": {
         "type-name": "Vector",
-        "length": 3,
+        "length": 6,
         "type": {
           "type-name": "Bytes",
           "length": 32
@@ -164,7 +164,7 @@
       ],
       "result type": {
         "type-name": "Vector",
-        "length": 3,
+        "length": 6,
         "type": {
           "type-name": "Boolean"
         }

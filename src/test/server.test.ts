@@ -18,33 +18,16 @@ describe("Community Server Entry Gate Smart Contract Tests", () => {
 
   // Helper to build Merkle root and proof dynamically
   const buildMerkleTree = (leaves: Uint8Array[], targetIndex: number, simulator: ServerSimulator) => {
-    const level0 = [...leaves];
-    const sib0 = level0[targetIndex ^ 1];
-    const dir0 = (targetIndex % 2 === 0);
-
-    const level1: Uint8Array[] = [];
-    for (let i = 0; i < 8; i += 2) {
-      level1.push(simulator.hashNodes(level0[i], level0[i + 1]));
+    if (leaves.length !== 64) throw new Error('Expected 64 leaves');
+    let level = [...leaves], index = targetIndex;
+    const proof: Uint8Array[] = [], directions: boolean[] = [];
+    while (level.length > 1) {
+      proof.push(level[index ^ 1]); directions.push(index % 2 === 0);
+      const parents: Uint8Array[] = [];
+      for (let i = 0; i < level.length; i += 2) parents.push(simulator.hashNodes(level[i], level[i + 1]));
+      level = parents; index = Math.floor(index / 2);
     }
-    const parentIndex0 = Math.floor(targetIndex / 2);
-    const sib1 = level1[parentIndex0 ^ 1];
-    const dir1 = (parentIndex0 % 2 === 0);
-
-    const level2: Uint8Array[] = [];
-    for (let i = 0; i < 4; i += 2) {
-      level2.push(simulator.hashNodes(level1[i], level1[i + 1]));
-    }
-    const parentIndex1 = Math.floor(parentIndex0 / 2);
-    const sib2 = level2[parentIndex1 ^ 1];
-    const dir2 = (parentIndex1 % 2 === 0);
-
-    const root = simulator.hashNodes(level2[0], level2[1]);
-
-    return {
-      root,
-      proof: [sib0, sib1, sib2],
-      directions: [dir0, dir1, dir2]
-    };
+    return { root: level[0], proof, directions };
   };
 
   it("1. Properly initializes contract parameters and server root", () => {
@@ -71,7 +54,7 @@ describe("Community Server Entry Gate Smart Contract Tests", () => {
     const tempSim = setupSimulator(userSecret, [], [], dummyRoot);
 
     const userPk = tempSim.publicKey(userSecret);
-    const mockLeaves = Array.from({ length: 8 }, () => randomBytes(32));
+    const mockLeaves = Array.from({ length: 64 }, () => randomBytes(32));
     mockLeaves[2] = userPk;
 
     // Build Merkle proof
@@ -89,7 +72,7 @@ describe("Community Server Entry Gate Smart Contract Tests", () => {
     const tempSim = setupSimulator(userSecret, [], [], dummyRoot);
 
     const userPk = tempSim.publicKey(userSecret);
-    const mockLeaves = Array.from({ length: 8 }, () => randomBytes(32));
+    const mockLeaves = Array.from({ length: 64 }, () => randomBytes(32));
     mockLeaves[2] = userPk;
 
     const { root, proof, directions } = buildMerkleTree(mockLeaves, 2, tempSim);
@@ -107,7 +90,7 @@ describe("Community Server Entry Gate Smart Contract Tests", () => {
     const tempSim = setupSimulator(userSecret, [], [], dummyRoot);
 
     const userPk = tempSim.publicKey(userSecret);
-    const mockLeaves = Array.from({ length: 8 }, () => randomBytes(32));
+    const mockLeaves = Array.from({ length: 64 }, () => randomBytes(32));
     mockLeaves[2] = userPk;
 
     const { root, proof, directions } = buildMerkleTree(mockLeaves, 2, tempSim);
@@ -117,5 +100,18 @@ describe("Community Server Entry Gate Smart Contract Tests", () => {
 
     // Try to claim again
     expect(() => simulator.claimEntry()).toThrow("failed assert: User has already joined the server");
+  });
+  it('accepts all 64 unique members without rotating the root', () => {
+    const secrets = Array.from({ length: 64 }, () => randomBytes(32));
+    const helper = setupSimulator(secrets[0], [], [], dummyRoot);
+    const leaves = secrets.map(secret => helper.publicKey(secret));
+    const first = buildMerkleTree(leaves, 0, helper);
+    const simulator = setupSimulator(secrets[0], first.proof, first.directions, first.root);
+    for (let index = 0; index < 64; index++) {
+      const membership = buildMerkleTree(leaves, index, helper);
+      simulator.switchUser(secrets[index], membership.proof, membership.directions);
+      expect(simulator.claimEntry().members_joined).toBe(BigInt(index + 1));
+    }
+    expect(() => simulator.claimEntry()).toThrow();
   });
 });
