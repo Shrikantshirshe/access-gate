@@ -1,7 +1,15 @@
-import { useState, useEffect } from 'react';
-import { Shield, Sparkles, Database, History, Wallet, Cpu, Lock } from 'lucide-react';
-import { submitServerallowlistCircuit } from './midnightClient';
-import { verifyAccessGateDeployment, validateAccessGateDeploymentRuntime } from './runtimeConfig';
+import OperatorSetup from './OperatorSetup';
+import { useState, useEffect } from "react";
+import {
+  deployServerallowlistContract,
+  readServerLedger,
+  serverBytes32,
+  submitServerallowlistCircuit,
+} from "./midnightClient";
+import {
+  verifyAccessGateDeployment,
+  validateAccessGateDeploymentRuntime,
+} from "./runtimeConfig";
 
 const RUNTIME = validateAccessGateDeploymentRuntime({
   networkId: import.meta.env.VITE_NETWORK_ID,
@@ -12,12 +20,31 @@ const RUNTIME = validateAccessGateDeploymentRuntime({
 });
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const readRoute = () => {
+    const route = window.location.hash.slice(1);
+    return ["dashboard", "deployer", "walletHub", "privacy"].includes(route)
+      ? route
+      : "home";
+  };
+  const [activeTab, setActiveTab] = useState(readRoute);
+  useEffect(() => {
+    const onRoute = () => {
+      if (["#content", "#main-content"].includes(window.location.hash)) return;
+      setActiveTab(readRoute());
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener("hashchange", onRoute);
+    return () => window.removeEventListener("hashchange", onRoute);
+  }, []);
+  useEffect(() => {
+    document.getElementById("page-title")?.focus();
+  }, [activeTab]);
+  const [feedback, setFeedback] = useState("");
+  const [showSecrets, setShowSecrets] = useState(false);
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<string>("0.00");
   const [connectingWallet, setConnectingWallet] = useState(false);
-  const [faucetLoading, setFaucetLoading] = useState(false);
   const [laceDetected, setLaceDetected] = useState(false);
   const [connectedWallet, setConnectedWallet] = useState<any>(null);
 
@@ -25,49 +52,59 @@ export default function App() {
   const [contractAddress, setContractAddress] = useState<string | null>(null);
   const [runtimeIssue, setRuntimeIssue] = useState<string | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
-  const [deployStep, setDeployStep] = useState(0);
 
-  const [ledger, setLedger] = useState({ invite_root_hash: "0x8fa3...c2bb", members_joined: 14, active: true });
-  const [formValues, setFormValues] = useState({ invite_code_secret: "", leaf_index: 3 });
+  const [ledger, setLedger] = useState<{
+    invite_root_hash: string;
+    members_joined: number | null;
+    active: boolean;
+  }>({ invite_root_hash: "", members_joined: null, active: false });
+  const [formValues, setFormValues] = useState({
+    invite_code_secret: "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+    merkle_proof: Array(6).fill('0'.repeat(64)).join(', '),
+    merkle_directions: "left, left, left, left, left, left",
+  });
   const [logs, setLogs] = useState<any[]>([]);
   const [isProving, setIsProving] = useState(false);
-  const [provingStep, setProvingStep] = useState(0);
-
-  const proofSteps = [
-    "Decrypting user private invite code witness...",
-    "Recomputing Merkle branch hashes...",
-    "Validating match against server invite root...",
-    "Emitting server entry approval proof..."
-  ];
-
-  const deploySteps = [
-    "Creating server gateway registry contract...",
-    "Setting depth-4 invite key dictionary state...",
-    "Publishing validator contract..."
-  ];
 
   useEffect(() => {
-    fetch('/deployment.json')
-      .then(response => {
-        if (!response.ok) throw new Error('Access Gate: deployment.json could not be loaded.');
+    fetch("/deployment.json")
+      .then((response) => {
+        if (!response.ok)
+          throw new Error("Access Gate: deployment.json could not be loaded.");
         return response.json();
       })
-      .then(deployment => {
+      .then((deployment) => {
         const verified = verifyAccessGateDeployment(deployment);
-        if (RUNTIME.contractAddress && RUNTIME.contractAddress !== verified.contractAddress) {
-          throw new Error('Access Gate: environment address does not match deployment evidence.');
+        if (
+          RUNTIME.contractAddress &&
+          RUNTIME.contractAddress !== verified.contractAddress
+        ) {
+          throw new Error(
+            "Access Gate: environment address does not match deployment evidence.",
+          );
         }
-        setContractAddress(verified.contractAddress);
-        setContractDeployed(true);
+        if (verified.network === RUNTIME.networkId) {
+          setContractAddress(verified.contractAddress);
+          setContractDeployed(true);
+        } else {
+          setContractAddress(null);
+          setContractDeployed(false);
+        }
         setRuntimeIssue(null);
       })
-      .catch(error => {
+      .catch((error) => {
         setContractAddress(null);
         setContractDeployed(false);
-        setRuntimeIssue(error instanceof Error ? error.message : 'Access Gate: configuration failed.');
+        setRuntimeIssue(
+          error instanceof Error
+            ? error.message
+            : "Access Gate: configuration failed.",
+        );
       });
     const detectLace = () => {
-      const hasMidnightWallet = Object.values((window as any).midnight ?? {}).some((candidate: any) => typeof candidate?.connect === 'function');
+      const hasMidnightWallet = Object.values(
+        (window as any).midnight ?? {},
+      ).some((candidate: any) => typeof candidate?.connect === "function");
       setLaceDetected(hasMidnightWallet);
     };
     detectLace();
@@ -78,13 +115,25 @@ export default function App() {
   const connectLace = async () => {
     setConnectingWallet(true);
     try {
-      const candidates = Object.values((window as any).midnight ?? {}) as Array<{
+      const candidates = Object.values(
+        (window as any).midnight ?? {},
+      ) as Array<{
         connect?: (networkId: string) => Promise<any>;
         name?: string;
+        rdns?: string;
       }>;
-      const wallet = candidates.find(candidate => typeof candidate.connect === 'function');
+      const oneAm = candidates.find(
+        (c) =>
+          /1am/i.test(`${c.name ?? ""} ${c.rdns ?? ""}`) &&
+          typeof c.connect === "function",
+      );
+      const wallet =
+        oneAm ??
+        candidates.find((candidate) => typeof candidate.connect === "function");
       if (!wallet?.connect) {
-        throw new Error('No Midnight wallet connector was detected. Install 1AM or Lace and unlock it.');
+        throw new Error(
+          "No Midnight wallet connector was detected. Install 1AM or Lace and unlock it.",
+        );
       }
 
       const connected = await wallet.connect(RUNTIME.networkId);
@@ -101,272 +150,616 @@ export default function App() {
         setContractAddress(import.meta.env.VITE_CONTRACT_ADDRESS);
         setContractDeployed(true);
       }
-      logTransaction('wallet', 'MIDNIGHT WALLET CONNECTED', '—', 'Connected through the Midnight DApp Connector API');
+      logTransaction(
+        "wallet",
+        "MIDNIGHT WALLET CONNECTED",
+        "—",
+        "Connected through the Midnight DApp Connector API",
+      );
     } catch (err) {
-      console.error('Midnight wallet connection failed:', err);
-      alert(err instanceof Error ? err.message : 'Midnight wallet connection failed.');
+      console.error("Midnight wallet connection failed:", err);
+      const raw = err instanceof Error ? err.message : String(err || "");
+      const msg = (raw.includes("tabs:outgoing.message.ready") || raw.includes("No Listener")) ? "Wallet extension is asleep or locked. Please open and unlock your 1AM / Lace wallet extension, then retry." : (raw || "Midnight wallet connection failed.");
+      setFeedback(msg);
     } finally {
       setConnectingWallet(false);
     }
   };
 
-
-
   const disconnectLace = () => {
     setWalletConnected(false);
     setWalletAddress(null);
     setWalletBalance("0.00");
-    logTransaction('0x0000...0000', 'LACE WALLET DISCONNECTED', '0.00 tNIGHT', 'Disconnected wallet context');
+    logTransaction(
+      "0x0000...0000",
+      "1AM WALLET DISCONNECTED",
+      "0.00 tNIGHT",
+      "Disconnected wallet context",
+    );
   };
 
   const requestFaucet = () => {
     if (!walletConnected) return;
-    window.open(RUNTIME.faucetUrl, '_blank', 'noopener,noreferrer');
-    logTransaction('—', 'FAUCET OPENED', '—', 'Funding must be confirmed by the official Midnight Preview faucet and wallet balance refresh.');
+    window.open(RUNTIME.faucetUrl, "_blank", "noopener,noreferrer");
+    logTransaction(
+      "—",
+      "FAUCET OPENED",
+      "—",
+      "Funding must be confirmed by the official Midnight Preview faucet and wallet balance refresh.",
+    );
   };
 
   const deployContractAction = async () => {
-    if (!contractAddress || runtimeIssue) {
-      alert('Access Gate: no verified Preview deployment is available.');
+    if (!connectedWallet) {
+      setFeedback("Connect a Midnight wallet before deploying.");
       return;
     }
-    setContractDeployed(true);
-    logTransaction('—', 'VERIFIED DEPLOYMENT ATTACHED', '—', `Using finalized Preview contract ${contractAddress}`);
+    setIsDeploying(true);
+    try {
+      const result = await deployServerallowlistContract(connectedWallet);
+      setContractAddress(result.contractAddress);
+      setContractDeployed(true);
+      setRuntimeIssue(null);
+      logTransaction(
+        result.txId,
+        "CONFIRMED ON MIDNIGHT",
+        "—",
+        `Fresh ${RUNTIME.networkId} deployment ${result.contractAddress}`,
+      );
+    } catch (error) {
+      setFeedback(
+        error instanceof Error ? error.message : "Contract deployment failed.",
+      );
+    } finally {
+      setIsDeploying(false);
+    }
   };
 
   const joinServer = async () => {
     if (!walletConnected || !contractDeployed || !contractAddress) return;
     try {
-      const result = await submitServerallowlistCircuit((window as any).__midnightConnectedWallet, contractAddress, 'claimEntry');
-      setLedger(prev => ({ ...prev, members_joined: prev.members_joined + 1 }));
-      logTransaction(result.txId, 'CONFIRMED ON MIDNIGHT', '—', 'Confirmed claimEntry on ' + contractAddress);
+      const proof = formValues.merkle_proof
+        .split(",")
+        .map((value, index) =>
+          serverBytes32(value, `Merkle sibling ${index + 1}`),
+        );
+      const directions = formValues.merkle_directions
+        .split(",")
+        .map((value) => value.trim().toLowerCase() === "right");
+      const result = await submitServerallowlistCircuit(
+        (window as any).__midnightConnectedWallet,
+        contractAddress,
+        "claimEntry",
+        [],
+        {
+          secretKey: serverBytes32(
+            formValues.invite_code_secret,
+            "Invite secret",
+          ),
+          merkleProof: proof,
+          merkleDirections: directions,
+        },
+      );
+      const chain = await readServerLedger(
+        (window as any).__midnightConnectedWallet,
+        contractAddress,
+      );
+      setLedger({
+        invite_root_hash: `0x${chain.root.slice(0, 8)}…${chain.root.slice(-4)}`,
+        members_joined: chain.membersJoined,
+        active: true,
+      });
+      logTransaction(
+        result.txId,
+        "CONFIRMED ON MIDNIGHT",
+        "—",
+        "Confirmed claimEntry on " + contractAddress,
+      );
       return;
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'The Midnight transaction failed.');
-      logTransaction('—', 'TRANSACTION FAILED', '—', err instanceof Error ? err.message : 'Unknown transaction failure');
+      setFeedback(
+        err instanceof Error ? err.message : "The Midnight transaction failed.",
+      );
+      logTransaction(
+        "—",
+        "TRANSACTION FAILED",
+        "—",
+        err instanceof Error ? err.message : "Unknown transaction failure",
+      );
       return;
     }
-
   };
 
-  const logTransaction = (hash: string, status: string, fee: string, details: string) => {
-    setLogs(prev => [
+  const logTransaction = (
+    hash: string,
+    status: string,
+    fee: string,
+    details: string,
+  ) => {
+    setLogs((prev) => [
       {
         hash,
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
         status,
         fee,
-        details
+        details,
       },
-      ...prev
+      ...prev,
     ]);
   };
 
-  if (runtimeIssue) {
-    return (
-      <main role="alert" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '32px', background: '#080b12', color: '#f8fafc' }}>
-        <section style={{ width: 'min(620px, 100%)', border: '1px solid #ef4444', borderRadius: '18px', padding: '28px', background: '#151922' }}>
-          <p style={{ margin: 0, color: '#fca5a5', fontWeight: 800, letterSpacing: '0.08em' }}>SAFE START BLOCKED</p>
-          <h1 style={{ margin: '12px 0', fontSize: 'clamp(1.7rem, 5vw, 2.6rem)' }}>Access Gate</h1>
-          <p style={{ lineHeight: 1.65, color: '#cbd5e1' }}>{runtimeIssue}</p>
-          <p style={{ lineHeight: 1.65, color: '#94a3b8' }}>No wallet or contract operation was attempted. Restore this repository's own Preview deployment record, then reload.</p>
-          <button onClick={() => window.location.reload()} style={{ marginTop: '8px', padding: '12px 18px', border: 0, borderRadius: '10px', fontWeight: 800, cursor: 'pointer' }}>Retry configuration</button>
-        </section>
-      </main>
-    );
-  }
+  const hasRead = logs.some(
+    (log) =>
+      log.status === "CONFIRMED ON MIDNIGHT" &&
+      log.details.startsWith("Confirmed "),
+  );
+  const ready = walletConnected && contractDeployed && !runtimeIssue;
+  const pageNames: Record<string, string> = {
+    dashboard: "Claim membership",
+    deployer: "Contract setup",
+    walletHub: "Wallet & activity",
+    privacy: "Privacy & scope",
+  };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', fontFamily: 'Outfit, sans-serif' }}>
-      
-      {/* Header */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 0', borderBottom: '1px solid var(--border-color)', marginBottom: '30px' }}>
-        <div>
-          <span style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '20px', background: 'rgba(147, 51, 234, 0.15)', color: '#a855f7', border: '1px solid rgba(147, 51, 234, 0.3)', fontWeight: 600 }}>Project 9</span>
-          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '6px' }}>Community Access Gate</h1>
-        </div>
-        <div>
-          {walletConnected ? (
-            <div style={{ background: 'rgba(147, 51, 234, 0.08)', border: '1px solid rgba(147, 51, 234, 0.25)', borderRadius: '12px', padding: '8px 16px' }}>
-              Balance: <strong style={{ color: '#a855f7' }}>{walletBalance} tNIGHT</strong>
-            </div>
-          ) : (
-            <button onClick={connectLace} style={{ width: 'auto' }}>Connect Lace Wallet</button>
-          )}
-        </div>
+    <div className="app">
+      <a
+        className="skip-link"
+        href="#content"
+        onClick={(e) => {
+          e.preventDefault();
+          document.getElementById("content")?.focus();
+        }}
+      >
+        Skip to content
+      </a>
+      <header className="site-header">
+        <a className="brand" href="#home">
+          Access Gate
+        </a>
+        <nav aria-label="Primary navigation">
+          <a
+            href="#home"
+            aria-current={activeTab === "home" ? "page" : undefined}
+          >
+            About
+          </a>
+          <a
+            href="#privacy"
+            aria-current={activeTab === "privacy" ? "page" : undefined}
+          >
+            Privacy
+          </a>
+          <a className="button-link" href="#dashboard">
+            Enter the gate <span aria-hidden="true">↗</span>
+          </a>
+        </nav>
       </header>
-
-<section className="home-dashboard" aria-labelledby="home-dashboard-title">
-        <div className="home-dashboard__lead">
-          <span className="home-kicker">Community checkpoint</span>
-          <h2 id="home-dashboard-title">Membership access</h2>
-          <p>Verify membership and receive an entry pass privately.</p>
-          <div className="home-actions">
-            <button type="button" onClick={() => setActiveTab('dashboard')}>Open Workspace</button>
-            <button type="button" className="home-secondary" onClick={() => setActiveTab('privacy')}>Read Privacy Model</button>
-          </div>
-        </div>
-        <div className="home-dashboard__grid">
-          <article className="home-card"><span>Network</span><strong>Midnight Preview</strong><small>{contractDeployed ? 'Contract verified' : 'Contract setup pending'}</small></article>
-          <article className="home-card"><span>Current signal</span><strong>Server root current</strong><small>Handle unlinkable</small></article>
-          <article className="home-card"><span>Wallet session</span><strong>{walletConnected ? 'Connected' : 'Not connected'}</strong><small>{walletConnected ? walletBalance + ' tNIGHT available' : 'Connect 1AM to continue'}</small></article>
-          <article className="home-card"><span>Contract address</span><strong className="home-address">{contractAddress ? contractAddress.slice(0, 14) + '…' : 'Awaiting deployment'}</strong><small>Unique project deployment</small></article>
-        </div>
-      </section>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
-        <button onClick={() => setActiveTab('dashboard')} style={{ width: 'auto', padding: '10px 20px', background: activeTab === 'dashboard' ? 'var(--color-primary)' : 'transparent', color: activeTab === 'dashboard' ? 'white' : 'var(--text-secondary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>🚪 Community Entrance</button>
-        <button onClick={() => setActiveTab('deployer')} style={{ width: 'auto', padding: '10px 20px', background: activeTab === 'deployer' ? 'var(--color-primary)' : 'transparent', color: activeTab === 'deployer' ? 'white' : 'var(--text-secondary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>⚙️ Server Gate Deployer</button>
-        <button onClick={() => setActiveTab('walletHub')} style={{ width: 'auto', padding: '10px 20px', background: activeTab === 'walletHub' ? 'var(--color-primary)' : 'transparent', color: activeTab === 'walletHub' ? 'white' : 'var(--text-secondary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>🔗 Server Member Wallet</button>
-        <button onClick={() => setActiveTab('privacy')} style={{ width: 'auto', padding: '10px 20px', background: activeTab === 'privacy' ? 'var(--color-primary)' : 'transparent', color: activeTab === 'privacy' ? 'white' : 'var(--text-secondary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>🔒 Access Entry Privacy</button>
-      </div>
-
-      <main style={{ minHeight: '400px' }}>
-        {activeTab === 'dashboard' && (
-          <div>
-            {(!walletConnected || !contractDeployed) && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239,68,68,0.2)', padding: '20px', borderRadius: '12px', marginBottom: '30px', textAlign: 'center' }}>
-                <h3 style={{ margin: 0, color: '#f87171' }}>⚠️ Setup Prerequisites Required</h3>
-                <p style={{ color: 'var(--text-secondary)', margin: '8px 0 0 0', fontSize: '0.9rem' }}>
-                  {!walletConnected ? "Please connect your Lace Wallet in the Wallet Hub." : "Please deploy the Compact contract in the ZK Deployer tab."}
-                </p>
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '30px', opacity: (walletConnected && contractDeployed) ? 1 : 0.4, pointerEvents: (walletConnected && contractDeployed) ? 'auto' : 'none' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <section style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-                  <h2 style={{ fontSize: '1.25rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#9333ea' }}><Database className="w-5 h-5" /> Server State</h2>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Invite root hash</span>
-                      <div style={{ fontSize: '1.2rem', fontFamily: 'monospace' }}>{ledger.invite_root_hash}</div>
-                    </div>
-                    <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Active Joined Members</span>
-                      <div style={{ fontSize: '1.6rem', fontWeight: 'bold' }}>{ledger.members_joined} accounts</div>
-                    </div>
-                  </div>
-                </section>
-              </div>
-
-              <div>
-                <section style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-                  <h2 style={{ fontSize: '1.25rem', marginBottom: '16px', color: '#9333ea', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Shield className="w-5 h-5" /> Claim Access
-                  </h2>
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Private Invite Code Witness</label>
-                    <input 
-                      type="password" 
-                      value={formValues.invite_code_secret} 
-                      onChange={e => setFormValues({ ...formValues, invite_code_secret: e.target.value })}
-                    />
-                  </div>
-                  <div style={{ marginBottom: '20px' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Merkle Leaf Index (Private)</label>
-                    <input 
-                      type="number" 
-                      value={formValues.leaf_index} 
-                      onChange={e => setFormValues({ ...formValues, leaf_index: Number(e.target.value) })}
-                    />
-                  </div>
-                  <button onClick={joinServer} disabled={isProving}>
-                    {isProving ? "Constructing invite validation proof..." : "Assert Invite & Join Server"}
-                  </button>
-
-                  {isProving && (
-                    <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(147,51,234,0.05)', border: '1px dashed #a855f7', borderRadius: '8px', fontSize: '0.8rem' }}>
-                      {proofSteps.map((step, idx) => (
-                        <div key={idx} style={{ padding: '3px 0', color: idx === provingStep ? 'white' : 'var(--text-secondary)', opacity: idx <= provingStep ? 1 : 0.4 }}>
-                          {idx < provingStep ? '✓' : '●'} {step}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
+      {activeTab === "home" ? (
+        <main id="content" tabIndex={-1} className="landing">
+          <section className="hero">
+            <div className="hero-copy">
+              <p className="eyebrow">Private membership · Midnight</p>
+              <h1 id="page-title" tabIndex={-1}>
+                Belong here.
+                <br />
+                Keep your invitation
+                <br />
+                <em>to yourself.</em>
+              </h1>
+              <p className="intro">
+                A community entrance built around proof of membership. Use an
+                organizer-issued invitation to claim access without publishing
+                the invite secret.
+              </p>
+              <div className="hero-actions">
+                <a className="button-link" href="#dashboard">
+                  Enter the gate →
+                </a>
+                <a href="#privacy">Understand the privacy model</a>
               </div>
             </div>
-          </div>
-        )}
-
-        {activeTab === 'deployer' && (
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '30px' }}>
-            <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#a855f7' }}>
-              <Cpu className="w-6 h-6" /> Server Gate Deployer
-            </h2>
-            {contractDeployed ? (
-              <p style={{ color: '#10b981' }}>Deployed Preview Address: {contractAddress}</p>
-            ) : (
-              <button onClick={deployContractAction} disabled={isDeploying || !walletConnected}>
-                {isDeploying ? "Deploying..." : "Compile & Deploy Contract"}
-              </button>
-            )}
-
-            {isDeploying && (
-              <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(147, 51, 234, 0.05)', border: '1px dashed #a855f7', borderRadius: '8px', fontSize: '0.8rem' }}>
-                {deploySteps.map((step, idx) => (
-                  <div key={idx} style={{ padding: '3px 0', color: idx === deployStep ? 'white' : 'var(--text-secondary)', opacity: idx <= deployStep ? 1 : 0.4 }}>
-                    {idx < deployStep ? '✓' : '●'} {step}
-                  </div>
-                ))}
+            <div className="gate-art" aria-hidden="true">
+              <div className="gate-frame">
+                <span>MEMBER ACCESS</span>
+                <div className="gate-key">↗</div>
+                <span>Proof, not your secret.</span>
               </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'walletHub' && (
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '30px' }}>
-            <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#a855f7' }}>
-              <Wallet className="w-6 h-6" /> Wallet Hub & logs
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '30px' }}>
-              <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', padding: '24px', borderRadius: '12px' }}>
-                <h3>Lace Account</h3>
-                {walletConnected ? (
-                  <div>
-                    <div style={{ fontFamily: 'monospace', wordBreak: 'break-all', fontSize: '0.85rem', marginBottom: '10px' }}>{walletAddress}</div>
-                    <button onClick={disconnectLace} style={{ width: 'auto', background: '#dc2626' }}>Disconnect</button>
-                  </div>
-                ) : (
-                  <button onClick={connectLace} style={{ width: 'auto' }}>Connect Wallet</button>
-                )}
+            </div>
+          </section>
+          <section
+            className="project-details"
+            aria-label="How the project works"
+          >
+            <article>
+              <h2>Bring an invitation</h2>
+              <p>
+                Your community organizer provides the private membership proof
+                inputs.
+              </p>
+            </article>
+            <article>
+              <h2>Prove you belong</h2>
+              <p>
+                The circuit checks the allowlist and prevents duplicate claims.
+              </p>
+            </article>
+            <article>
+              <h2>Keep the boundary clear</h2>
+              <p>
+                Membership is recorded on-chain; your invite secret is not
+                published.
+              </p>
+            </article>
+          </section>
+          <aside className="scope-note">
+            <strong>Before you begin</strong>
+            <p>
+              This workspace claims on-chain membership. It does not
+              automatically assign a Discord role or grant access in another
+              service.
+            </p>
+          </aside>
+        </main>
+      ) : (
+        <div className="workspace">
+          <nav className="workspace-nav" aria-label="Workspace pages">
+            <span className="eyebrow">Workspace</span>
+            {Object.entries(pageNames).map(([route, label]) => (
+              <a
+                key={route}
+                href={"#" + route}
+                aria-current={activeTab === route ? "page" : undefined}
+              >
+                {label}
+              </a>
+            ))}
+            <p>Midnight {RUNTIME.networkId}</p>
+          </nav>
+          <main id="content" tabIndex={-1} className="workspace-content">
+            <div className="page-heading">
+              <div>
+                <p className="eyebrow">Private membership · Midnight</p>
+                <h1 id="page-title" tabIndex={-1}>
+                  {pageNames[activeTab]}
+                </h1>
               </div>
-              <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', padding: '24px', borderRadius: '12px' }}>
-                <h3>Get tNIGHT</h3>
-                <button onClick={requestFaucet} disabled={!walletConnected || faucetLoading}>
-                  {faucetLoading ? "Requesting..." : "Mint Faucet Tokens"}
+              <span className="session-status">
+                {walletConnected ? "Wallet connected" : "Wallet disconnected"}
+              </span>
+            </div>
+            {feedback && (
+              <div className="notice error" role="alert">
+                <strong>Action could not complete</strong>
+                <p>{feedback}</p>
+                <button className="secondary" onClick={() => setFeedback("")}>
+                  Dismiss message
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'privacy' && (
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '30px' }}>
-            <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#a855f7' }}>
-              <Lock className="w-6 h-6" /> Zero-Knowledge Privacy Model
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-              <div style={{ background: 'rgba(16, 185, 129, 0.03)', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '24px', borderRadius: '12px' }}>
-                <h3 style={{ color: '#10b981' }}>Can Learn:</h3>
-                <ul>
-                  <li>Cumulative joined members counts.</li>
-                  <li>Server invite code hash root.</li>
-                </ul>
+            )}
+            {runtimeIssue && (
+              <section className="notice error" role="alert">
+                <h2>Contract actions unavailable</h2>
+                <p>{runtimeIssue}</p>
+                <p>
+                  Restore this repository’s deployment configuration before
+                  using wallet or contract actions.
+                </p>
+                <button onClick={() => window.location.reload()}>
+                  Retry configuration
+                </button>
+              </section>
+            )}
+            {activeTab === "dashboard" && (
+              <>
+                <p className="page-intro">
+                  Prove that your invitation belongs to the community allowlist.
+                </p>
+                {!ready && (
+                  <div className="notice">
+                    <strong>Complete setup to submit</strong>
+                    <p>
+                      {!walletConnected
+                        ? "Connect a Midnight wallet, then review the contract configuration."
+                        : "A configured contract is required."}
+                    </p>
+                    <a href={!walletConnected ? "#walletHub" : "#deployer"}>
+                      {!walletConnected
+                        ? "Go to wallet"
+                        : "Review contract setup"}{" "}
+                      →
+                    </a>
+                  </div>
+                )}
+                {logs[0]?.status === "CONFIRMED ON MIDNIGHT" && (
+                  <div className="notice" role="status">
+                    <strong>Transaction confirmed</strong>
+                    <p>{logs[0].details}</p>
+                    <a href="#walletHub">
+                      View transaction in session activity →
+                    </a>
+                  </div>
+                )}
+                <div className="task-layout">
+                  <section className="form-panel">
+                    <h2>Your invitation</h2>
+                    <p>
+                      Ask your organizer for the invite secret, six Merkle
+                      siblings, and their directions. These values must match
+                      the current allowlist.
+                    </p>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!ready || isProving) return;
+                        setFeedback("");
+                        setIsProving(true);
+                        try {
+                          await joinServer();
+                        } finally {
+                          setIsProving(false);
+                        }
+                      }}
+                    >
+                      <fieldset disabled={!ready || isProving}>
+                        <legend className="sr-only">Your invitation</legend>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', margin: '14px 0' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }} />
+                          <span style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>Shielded Community Access Pass Attached</span>
+                        </div>
+                        <details style={{ marginBottom: '16px', fontSize: '0.8rem', color: '#94a3b8' }}>
+                          <summary style={{ cursor: 'pointer', padding: '4px 0', userSelect: 'none' }}>Advanced / Custom Proof</summary>
+                          <div style={{ marginTop: '8px' }}>
+                            <label htmlFor="invite_code_secret">
+                              Invite secret
+                              <input
+                                id="invite_code_secret"
+                                type={showSecrets ? "text" : "password"}
+                                autoComplete="off"
+                                value={formValues.invite_code_secret}
+                                onChange={(e) =>
+                                  setFormValues({
+                                    ...formValues,
+                                    invite_code_secret: e.target.value,
+                                  })
+                                }
+                              />
+                            </label>
+                            <label htmlFor="merkle_proof">
+                              Merkle siblings
+                              <input
+                                id="merkle_proof"
+                                type="text"
+                                autoComplete="off"
+                                value={formValues.merkle_proof}
+                                onChange={(e) =>
+                                  setFormValues({
+                                    ...formValues,
+                                    merkle_proof: e.target.value,
+                                  })
+                                }
+                              />
+                            </label>
+                            <label htmlFor="merkle_directions">
+                              Branch directions
+                              <input
+                                id="merkle_directions"
+                                type="text"
+                                autoComplete="off"
+                                value={formValues.merkle_directions}
+                                onChange={(e) =>
+                                  setFormValues({
+                                    ...formValues,
+                                    merkle_directions: e.target.value,
+                                  })
+                                }
+                              />
+                            </label>
+                          </div>
+                        </details>
+                        <label className="reveal-control">
+                          <input
+                            type="checkbox"
+                            checked={showSecrets}
+                            onChange={(e) => setShowSecrets(e.target.checked)}
+                          />{" "}
+                          Show private inputs
+                        </label>
+                        <button type="submit">
+                          {isProving
+                            ? "Waiting for proof & confirmation…"
+                            : "Prove invitation & claim access"}
+                        </button>
+                      </fieldset>
+                      {isProving && (
+                        <p role="status">
+                          Keep this page open while the wallet and network
+                          complete the request.
+                        </p>
+                      )}
+                    </form>
+                  </section>
+                  <aside className="context-panel">
+                    <h2>Community record</h2>
+                    <p>
+                      Updated after a successful submission in this session. Not
+                      a live feed.
+                    </p>
+                    <dl>
+                      <dt>Invite root</dt>
+                      <dd>
+                        {hasRead ? ledger.invite_root_hash : "Not read yet"}
+                      </dd>
+                      <dt>Joined members</dt>
+                      <dd>
+                        {hasRead ? ledger.members_joined : "Not read yet"}
+                      </dd>
+                    </dl>
+                    <div className="disclosure">
+                      <h3>Know what is public</h3>
+                      <p>
+                        The allowlist root, joined-member count, and spent
+                        nullifiers are public. A nullifier prevents the same
+                        invitation from being used twice.
+                      </p>
+                      <a href="#privacy">Read the full scope →</a>
+                    </div>
+                  </aside>
+                </div>
+              </>
+            )}
+            {activeTab === "walletHub" && (
+              <>
+                <div className="wallet-layout">
+                  <section className="form-panel">
+                    <h2>Your Midnight wallet</h2>
+                    <p>
+                      {laceDetected
+                        ? "A compatible wallet connector was detected."
+                        : "Install and unlock a compatible Midnight wallet, such as 1AM or Lace."}
+                    </p>
+                    {walletConnected ? (
+                      <>
+                        <dl>
+                          <dt>Address</dt>
+                          <dd className="address">{walletAddress}</dd>
+                          <dt>Balance at connection</dt>
+                          <dd>{walletBalance} tNIGHT</dd>
+                        </dl>
+                        <button className="secondary" onClick={disconnectLace}>
+                          Disconnect session
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        disabled={connectingWallet}
+                        onClick={connectLace}
+                      >
+                        {connectingWallet
+                          ? "Connecting…"
+                          : "Connect Midnight wallet"}
+                      </button>
+                    )}
+                  </section>
+                  <section className="context-panel">
+                    <h2>Test-network funding</h2>
+                    <p>
+                      The faucet opens in a new tab. Funding is not automatic;
+                      reconnect afterward to refresh the displayed balance.
+                    </p>
+                    <button
+                      className="secondary"
+                      disabled={!walletConnected}
+                      onClick={requestFaucet}
+                    >
+                      Open network faucet ↗
+                    </button>
+                  </section>
+                </div>
+                <section className="activity">
+                  <h2>Session activity</h2>
+                  {logs.length === 0 ? (
+                    <p>
+                      No activity yet. Wallet connections and transaction
+                      results will appear here.
+                    </p>
+                  ) : (
+                    <ol>
+                      {logs.map((log, index) => (
+                        <li key={index}>
+                          <time>{log.timestamp}</time>
+                          <strong>{log.status}</strong>
+                          <p>{log.details}</p>
+                          <code>{log.hash}</code>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </section>
+              </>
+            )}
+            {activeTab === 'deployer' && <OperatorSetup wallet={walletConnected ? connectedWallet : null} address={runtimeIssue ? null : contractAddress} />}
+            {activeTab === "deployer" && (
+              <section className="form-panel setup-panel">
+                <h2>Contract configuration</h2>
+                <p>
+                  This workspace uses its own contract on Midnight{" "}
+                  {RUNTIME.networkId}. A loaded address is configuration
+                  evidence, not a fresh check of chain state.
+                </p>
+                <dl>
+                  <dt>Configured address</dt>
+                  <dd className="address">
+                    {contractAddress || "No address configured"}
+                  </dd>
+                </dl>
+                {!contractDeployed && (
+                  <>
+                    <p>
+                      Deployment is a wallet-approved network transaction.
+                      Connect your wallet first.
+                    </p>
+                    <button
+                      disabled={
+                        !walletConnected || isDeploying
+                      }
+                      onClick={deployContractAction}
+                    >
+                      {isDeploying
+                        ? "Waiting for deployment confirmation…"
+                        : "Deploy contract"}
+                    </button>
+                  </>
+                )}
+                {isDeploying && (
+                  <p role="status">
+                    Waiting for the wallet and network. Do not close this page.
+                  </p>
+                )}
+              </section>
+            )}
+            {activeTab === "privacy" && (
+              <div className="privacy-layout">
+                <section className="form-panel">
+                  <span className="eyebrow">Public surface</span>
+                  <h2>What the contract reveals</h2>
+                  <p>
+                    The allowlist root, joined-member count, and spent
+                    nullifiers are public. A nullifier prevents the same
+                    invitation from being used twice.
+                  </p>
+                </section>
+                <section className="context-panel">
+                  <span className="eyebrow">Private inputs</span>
+                  <h2>Where privacy stops</h2>
+                  <p>
+                    The claim circuit uses your secret and Merkle path as
+                    private witnesses. This does not make wallet activity or
+                    transaction metadata anonymous.
+                  </p>
+                </section>
+                <aside className="scope-note">
+                  <strong>Product scope</strong>
+                  <p>
+                    This workspace claims on-chain membership. It does not
+                    automatically assign a Discord role or grant access in
+                    another service.
+                  </p>
+                  <p>
+                    Use test-network credentials only. Do not enter a wallet
+                    recovery phrase or reuse secrets from another service.
+                  </p>
+                </aside>
               </div>
-              <div style={{ background: 'rgba(239, 68, 68, 0.03)', border: '1px solid rgba(239, 68, 68, 0.15)', padding: '24px', borderRadius: '12px' }}>
-                <h3 style={{ color: '#f87171' }}>Cannot Learn:</h3>
-                <ul>
-                  <li>Your exact invite code or invite leaf index.</li>
-                  <li>Your private address mapping parameters.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
+            )}
+          </main>
+        </div>
+      )}
+      <footer>
+        <span>Access Gate</span>
+        <span>Midnight · {RUNTIME.networkId} · Experimental workspace</span>
+        <a href="#privacy">Privacy & limitations</a>
+      </footer>
     </div>
   );
 }
